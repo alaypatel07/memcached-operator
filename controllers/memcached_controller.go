@@ -18,7 +18,8 @@ package controllers
 
 import (
 	"context"
-
+	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +31,7 @@ import (
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
 	client.Client
+	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
@@ -46,11 +48,41 @@ type MemcachedReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
+
+//+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds/finalizers,verbs=update
+
 func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	r.Log = log.FromContext(ctx)
+	log := r.Log.WithValues("memcached", req.NamespacedName)
 
 	// your logic here
+	// 1. get the memchaced object
+	// 2. update dummy status
+	memcached := &cachev1alpha1.Memcached{}
+	err := r.Get(ctx, req.NamespacedName, memcached)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			log.Info("Memcached resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		log.Error(err, "Failed to get Memcached")
+		return ctrl.Result{}, err
+	}
+	log.Info("getting reconcile request for", req)
 
+	memcached.Status = cachev1alpha1.MemcachedStatus{Nodes: []string{"node-1", "node-2", "dummy", "list"}}
+
+	err = r.Status().Update(ctx, memcached)
+	if err != nil {
+		log.Error(err, "Failed to update memchacehed states", memcached.Status)
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
 }
 
