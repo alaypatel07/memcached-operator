@@ -74,13 +74,13 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "Failed to get Memcached")
 		return ctrl.Result{}, err
 	}
-	log.Info("getting reconcile request for", req)
+	log.Info("getting reconcile request for", "object", req)
 
 	memcached.Status = cachev1alpha1.MemcachedStatus{Nodes: []string{"node-1", "node-2", "dummy", "list"}}
 
 	err = r.Status().Update(ctx, memcached)
 	if err != nil {
-		log.Error(err, "Failed to update memchacehed states", memcached.Status)
+		log.Error(err, "Failed to update memchacehed states", "status", memcached.Status)
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
